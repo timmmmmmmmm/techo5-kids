@@ -33,6 +33,14 @@ const (
 	saveAfter = 3 * time.Second
 	// menuNightBrightness is the least the menu is lit at night, in percent.
 	menuNightBrightness = 15
+
+	// walkFrame is how often the hands are drawn while they walk back to the real time.
+	walkFrame = 45 * time.Millisecond
+
+	// tapLikeHold and tapLikeMove are the touch layer's tapHold and tapMove: in follow mode a wobbling
+	// tap arrives as a hold and a drag instead, and the clock says the time for it all the same.
+	tapLikeHold = 500 * time.Millisecond
+	tapLikeMove = 40
 )
 
 // Clock is the screen and everything that reaches it.
@@ -45,6 +53,13 @@ type Clock struct {
 	volumeAt time.Time // the volume last changed
 	chord    *time.Timer
 	save     *time.Timer
+
+	// the children's play, and what a finger that may still turn out to be a tap has done
+	play      core.Play
+	playPrev  core.Play   // the play before the finger took a hand, for a release that was a tap
+	holdX, holdY  int     // where the finger went down
+	holdAt        time.Time
+	soon          *time.Timer // a frame of the walk back, asked for
 
 	dev   *screen.Device
 	light int // the backlight as last set, -1 before the first frame
@@ -83,6 +98,9 @@ func (c *Clock) Start(context.Context) error {
 	}
 	c.dev, c.light = dev, -1
 	c.ears.Do(func() {
+		// Every moving finger is followed, so a child can take a hand and turn it the moment the
+		// finger moves; a tap is a tap still, and the wobbling ones the clock knows apart (gesture).
+		touch.Get().SetFollow(true)
 		touch.Get().Gestures.Listen(c.gesture)
 		buttons.Get().Events.Listen(c.button)
 	})
@@ -128,17 +146,19 @@ func (c *Clock) frame(now time.Time) {
 		c.menu, c.editing = false, -1
 		slog.Info("kids: parent menu closed, left alone")
 	}
+	walking := c.play.Tick(now)
+	shown := c.play.Shown(now)
 	s, menu := c.set, c.menu
 	sc := face.Scene{
-		Now: now, Style: s.Style, Night: s.Night(now), Editing: c.editing,
+		Now: shown, Style: s.Style, Night: s.Night(now), Editing: c.editing,
 		Volume: s.Volume, MaxVolume: s.MaxVolume, ShowVolume: now.Sub(c.volumeAt) < volumeShows,
+		Playing: c.play.Playing(),
 	}
 	c.mu.Unlock()
 	if menu {
 		st := status()
 		sc.Menu, sc.Address = core.MenuSettings(s, st), st.Address
 	}
-
 	face.Draw(c.dev.Canvas(), sc)
 	if err := c.dev.Present(); err != nil {
 		slog.Warn("kids: presenting a frame failed", "err", err)
@@ -160,6 +180,24 @@ func (c *Clock) frame(now time.Time) {
 			c.light = level
 		}
 	}
+	if walking {
+		c.pokeSoon(walkFrame)
+	}
+}
+
+// pokeSoon asks for a frame d later, while the hands walk back, replacing one asked for before.
+func (c *Clock) pokeSoon(d time.Duration) {
+	c.mu.Lock()
+	if c.soon != nil {
+		c.soon.Stop()
+	}
+	c.soon = time.AfterFunc(d, func() {
+		c.mu.Lock()
+		c.soon = nil
+		c.mu.Unlock()
+		c.wake()
+	})
+	c.mu.Unlock()
 }
 
 // gesture is a finger on the screen. Listeners run on the touch reader: nothing here may block.
@@ -177,10 +215,53 @@ func (c *Clock) gesture(g touch.Gesture) {
 		c.wake()
 		return
 	}
-	// Only a tap: the volume is the buttons' alone, so a swipe across the clock does nothing.
-	if g.Kind == touch.Tap {
-		sayTime(time.Now(), c.settings().Language)
+	now := time.Now()
+	c.mu.Lock()
+	// The scene says where the hands are, which is what a child takes one of.
+	sc := face.Scene{Now: c.play.Shown(now), Night: c.set.Night(now)}
+	say, hand := time.Time{}, core.HandNone
+	switch g.Kind {
+	case touch.Tap:
+		c.play.Touch(now)
+		say = c.play.Shown(now)
+	case touch.Hold:
+		c.holdX, c.holdY, c.holdAt, c.playPrev = g.X, g.Y, now, c.play
+		hand = face.HandAt(sc, g.X, g.Y)
+		if hand != core.HandNone {
+			c.play.Grab(hand, sc.Now, face.Turns(sc, g.X, g.Y))
+		}
+	case touch.Drag:
+		if c.play.Held() != core.HandNone {
+			c.play.Drag(face.Turns(sc, g.X, g.Y))
+		}
+	case touch.Release:
+		// A wobble of a tap arrives as a hold and a drag in follow mode, and a grab that never
+		// turned the hand was no grab either: both are taps, or nothing, and the play goes back to
+		// what it was.
+		if now.Sub(c.holdAt) < tapLikeHold && abs(g.X-c.holdX) <= tapLikeMove && abs(g.Y-c.holdY) <= tapLikeMove {
+			c.play, say = c.playPrev, c.playPrev.Shown(now)
+			c.play.Touch(now)
+		} else if c.play.Held() != core.HandNone && !c.play.Turned() {
+			c.play = c.playPrev
+		} else {
+			c.play.Release(now)
+		}
 	}
+	c.mu.Unlock()
+	if hand != core.HandNone {
+		slog.Info("kids: a hand taken", "hand", hand == core.HandMinute)
+	}
+	if !say.IsZero() {
+		sayTime(say, c.settings().Language)
+	}
+	c.wake()
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // button is a button. Volume steps on the press and as it repeats; the top button, which on TECHO5
@@ -231,6 +312,9 @@ func (c *Clock) chordDue() {
 	c.chord = nil
 	if due {
 		c.menu, c.editing, c.menuAt = !c.menu, -1, time.Now()
+		if c.menu {
+			c.play.Cancel() // the menu wants the screen to itself; the real clock waits behind it
+		}
 		slog.Info("kids: parent menu", "open", c.menu)
 	}
 	c.mu.Unlock()

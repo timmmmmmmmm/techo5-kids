@@ -20,10 +20,13 @@ func TestEveryScreenDraws(t *testing.T) {
 	menu := core.MenuSettings(s, core.Status{SSH: true, Address: "192.0.2.10"})
 	scenes := map[string]Scene{
 		"day":             {Now: now, Style: core.StyleYellow},
+		"day-play":        {Now: now, Style: core.StyleYellow, Playing: true},
 		"day-volume":      {Now: now, Style: core.StyleYellow, ShowVolume: true, Volume: 12, MaxVolume: 20},
 		"dark":            {Now: now, Style: core.StyleDark},
+		"dark-play":       {Now: now, Style: core.StyleDark, Playing: true},
 		"dark-volume":     {Now: now, Style: core.StyleDark, ShowVolume: true, Volume: 12, MaxVolume: 20},
 		"night":           {Now: time.Date(2026, 10, 25, 21, 40, 0, 0, time.Local), Night: true},
+		"night-play":      {Now: time.Date(2026, 10, 25, 21, 40, 0, 0, time.Local), Night: true, Playing: true},
 		"menu":            {Now: now, Menu: menu, Editing: -1},
 		"menu-volume":     {Now: now, Menu: menu, Editing: 0},
 		"menu-bed":        {Now: now, Menu: menu, Editing: 4},

@@ -96,31 +96,72 @@ func (c canvas) ringAt(cx, cy, r0, r1, a0, a1 float64, col color.RGBA) {
 	}
 }
 
+// polyEdge is one edge of a polygon, laid out for the two things asked of it in the scan: the x it
+// crosses at a row's centre, and how far a pixel is from it.
+type polyEdge struct {
+	ax, ay    float64 // where the edge starts
+	dx, dy    float64 // how it runs, unnormalised, for the crossing
+	nx, ny    float64 // the same made unit length, for the distance
+}
+
 // poly fills a convex polygon with a soft edge: a pixel is covered as far as it is inside every edge,
-// so a shape drawn whole has no seams where triangles would meet.
+// so a shape drawn whole has no seams where triangles would meet. Each row is scanned only as far as
+// the polygon itself reaches there, and a pixel's distance from an edge is a multiply and a
+// subtract: the hands are nearly the whole cost of a frame on the Spot, and this is where it went.
 func (c canvas) poly(pts [][2]float64, col color.RGBA) {
 	n := len(pts)
+	if n < 3 || n > 8 {
+		return // callers draw convex shapes of a handful of points
+	}
 	var mx, my float64
 	x0, y0, x1, y1 := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
 	for _, q := range pts {
 		mx, my = mx+q[0]/float64(n), my+q[1]/float64(n)
 		x0, y0, x1, y1 = math.Min(x0, q[0]), math.Min(y0, q[1]), math.Max(x1, q[0]), math.Max(y1, q[1])
 	}
-	edge := func(px, py float64, i int) float64 {
+	var edges [8]polyEdge
+	for i := range n {
 		a, b := pts[i], pts[(i+1)%n]
-		ex, ey := b[0]-a[0], b[1]-a[1]
-		return ((px-a[0])*ey - (py-a[1])*ex) / math.Hypot(ex, ey)
+		e := &edges[i]
+		e.ax, e.ay, e.dx, e.dy = a[0], a[1], b[0]-a[0], b[1]-a[1]
+		l := math.Hypot(e.dx, e.dy)
+		e.nx, e.ny = e.dx/l, e.dy/l
+	}
+	dist := func(px, py float64, e *polyEdge) float64 {
+		return (px-e.ax)*e.ny - (py-e.ay)*e.nx
 	}
 	sign := 1.0
-	if edge(mx, my, 0) < 0 {
+	if dist(mx, my, &edges[0]) < 0 {
 		sign = -1
 	}
+	es := edges[:n]
+	for i := range es {
+		es[i].nx, es[i].ny = sign*es[i].nx, sign*es[i].ny // inside is the same side of every edge
+	}
 	for y := int(y0) - 1; y <= int(y1)+1; y++ {
-		for x := int(x0) - 1; x <= int(x1)+1; x++ {
-			px, py := float64(x)+0.5, float64(y)+0.5
+		py := float64(y) + 0.5
+		lo, hi := math.MaxInt, math.MinInt
+		for i := range es {
+			e := &es[i]
+			x := e.ax
+			if e.dy != 0 {
+				t := (py - e.ay) / e.dy
+				if t < 0 {
+					t = 0
+				} else if t > 1 {
+					t = 1
+				}
+				x = e.ax + e.dx*t
+			}
+			lo, hi = min(lo, int(math.Floor(x))-1), max(hi, int(math.Ceil(x))+1)
+		}
+		for x := max(int(x0), lo); x <= min(int(x1), hi); x++ {
+			px := float64(x) + 0.5
 			d := math.Inf(1)
-			for i := range n {
-				d = math.Min(d, sign*edge(px, py, i))
+			for i := range es {
+				if v := dist(px, py, &es[i]); v < d {
+					d = v
+				}
 			}
 			c.blend(x, y, col, d+0.5)
 		}

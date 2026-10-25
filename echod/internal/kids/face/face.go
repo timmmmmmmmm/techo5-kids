@@ -27,6 +27,10 @@ type Scene struct {
 	// Volume is shown on the rim while ShowVolume: the level, and the most the children may set.
 	Volume, MaxVolume int
 	ShowVolume        bool
+
+	// Playing is the children's time: the hands are where they left them, or on their way back,
+	// and the rim says that this is not the real clock.
+	Playing bool
 }
 
 // Draw paints s onto dst, a 480×480 image.
@@ -39,6 +43,9 @@ func Draw(dst *image.RGBA, s Scene) {
 	case s.Night:
 		draw.Draw(dst, dst.Rect, background("night", nightSky), image.Point{}, draw.Src)
 		volumeRim(c, night, s)
+		if s.Playing {
+			playDots(c)
+		}
 		hands(c, night, s.Now, nightX, nightY, nightK)
 	default:
 		l := yellow
@@ -49,9 +56,38 @@ func Draw(dst *image.RGBA, s Scene) {
 			c.fill(l.ground)
 			dial(c, l, center, center, 1)
 		}), image.Point{}, draw.Src)
-		c.ring(rimIn, rimOut, 0, 2*math.Pi, l.rim)
+		if s.Playing {
+			playRim(c, l)
+		} else {
+			c.ring(rimIn, rimOut, 0, 2*math.Pi, l.rim)
+		}
 		volumeRim(c, l, s)
 		hands(c, l, s.Now, center, center, 1)
+	}
+}
+
+// playRim is the rim while the children's time is shown: the ring dashed, in the minutes' own color,
+// so anyone can see at a glance that the hands are not the real clock's — on the day's yellow as on
+// the black. Each dash is a little trapezoid along the ring; the whole rim is a couple dozen of them,
+// which the scan of a real arc would not have been.
+func playRim(c canvas, l look) {
+	const dashes = 24
+	for i := range dashes {
+		a := float64(i) / dashes
+		x0, y0 := at(center, center, rimIn+3, a)
+		x1, y1 := at(center, center, rimOut-3, a)
+		x2, y2 := at(center, center, rimOut-3, a+0.55/dashes)
+		x3, y3 := at(center, center, rimIn+3, a+0.55/dashes)
+		c.poly([][2]float64{{x0, y0}, {x1, y1}, {x2, y2}, {x3, y3}}, l.minutes)
+	}
+}
+
+// playDots is the night's version: twelve quiet dots round the small clock, a ring the child knows
+// as the minutes' own, saying the same.
+func playDots(c canvas) {
+	for h := range 12 {
+		x, y := at(nightX, nightY, minuteRing*nightK+9, float64(h)/12)
+		c.disc(x, y, 2.4, night.minutes)
 	}
 }
 
