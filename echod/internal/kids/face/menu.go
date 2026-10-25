@@ -14,21 +14,57 @@ import (
 // is the settings as large round buttons, each showing its value, with Klaar in the middle; a setting's
 // own page has its value large in the middle with an arc for how far along it is, − and + either side,
 // or two buttons for a choice of two, and Klaar below.
+//
+// It wears the clock's own colors, in the look the clock is set to: the red of the hours for values,
+// the blue of the minute hand for what a tap does, on the yellow of the classroom clock or on black.
+
+// theme is the menu's colors in one of the clock's looks.
+type theme struct {
+	ground             color.RGBA
+	key, keyText       color.RGBA // a button, and a name on one
+	icon, value, label color.RGBA // on a setting's button: its icon, its value, its name
+	done, doneText     color.RGBA // Klaar
+	title, hint        color.RGBA // a page's heading and the line under it
+	track, arc         color.RGBA // the arc: all of it, and as far as the value goes
+	sign, signEnd      color.RGBA // − and +, and either when it can go no further
+	chosen, chosenText color.RGBA // the choice that is made
+}
 
 var (
-	menuGround = rgb(12, 15, 20)
-	menuKey    = rgb(34, 40, 50) // a button's face, as TECHO5's keys
-	menuText   = rgb(236, 240, 244)
-	menuDim    = rgb(128, 138, 150)
-	menuAccent = rgb(255, 208, 36) // the classroom clock's yellow
-	menuInk    = rgb(20, 24, 30)   // text on the accent
+	yellowMenu = theme{
+		ground: rgb(255, 208, 36),
+		key:    rgb(255, 248, 230), keyText: rgb(26, 56, 72),
+		icon: rgb(34, 66, 196), value: rgb(228, 36, 32), label: rgb(26, 56, 72),
+		done: rgb(34, 66, 196), doneText: rgb(255, 255, 255),
+		title: rgb(26, 56, 72), hint: rgb(120, 88, 0),
+		track: rgb(255, 230, 130), arc: rgb(34, 66, 196),
+		sign: rgb(34, 66, 196), signEnd: rgb(190, 196, 220),
+		chosen: rgb(34, 66, 196), chosenText: rgb(255, 255, 255),
+	}
+	darkMenu = theme{
+		ground: rgb(0, 0, 0),
+		key:    rgb(28, 32, 42), keyText: rgb(236, 240, 244),
+		icon: rgb(72, 134, 255), value: rgb(255, 92, 76), label: rgb(150, 158, 172),
+		done: rgb(255, 208, 36), doneText: rgb(20, 24, 30),
+		title: rgb(236, 240, 244), hint: rgb(140, 148, 160),
+		track: rgb(40, 44, 56), arc: rgb(255, 208, 36),
+		sign: rgb(236, 240, 244), signEnd: rgb(84, 90, 104),
+		chosen: rgb(72, 134, 255), chosenText: rgb(255, 255, 255),
+	}
 )
 
+func themeFor(style string) theme {
+	if style == core.StyleDark {
+		return darkMenu
+	}
+	return yellowMenu
+}
+
 // The ring: where its buttons are and how big. Every button is at least as wide as a fingertip
-// (104 px is about 14 mm on the Spot's panel), with room between them.
+// (112 px is about 15 mm on the Spot's panel), with room between them.
 const (
 	ringR   = 156.0
-	keyR    = 52.0
+	keyR    = 56.0
 	doneR   = 60.0
 	pageY   = 240.0 // the middle line of a setting's page
 	stepX   = 136.0 // how far − and + are from the middle
@@ -106,75 +142,108 @@ func MenuTarget(x, y int, menu []core.Setting, editing int) Target {
 }
 
 func drawMenu(c canvas, s Scene) {
-	c.fill(menuGround)
+	t := themeFor(s.Style)
+	c.fill(t.ground)
 	if s.Editing >= 0 && s.Editing < len(s.Menu) {
-		drawPage(c, s.Menu[s.Editing], s.Address)
+		drawPage(c, t, s.Menu[s.Editing], s.Address)
 		return
 	}
-	value, label, done := comic(true, 24), comic(false, 15), comic(true, 24)
-	if value == nil || label == nil {
+	label, done := comic(false, 14), comic(true, 24)
+	if label == nil || done == nil {
 		return
 	}
+	// Each button: what it is as an icon, its value large, and its name under that.
 	for i, m := range s.Menu {
 		x, y := keyAt(i, len(s.Menu))
-		c.disc(x, y, keyR, menuKey)
-		f := fitted(m.Value, 24, int(keyR*2-16))
-		c.centered(f, m.Value, int(x), int(y)+2, menuAccent)
-		c.centered(label, m.Short, int(x), int(y)+24, menuDim)
+		c.disc(x, y, keyR, t.key)
+		icon(c, m.ID, x, y-26, t.icon, t.key)
+		f := fitted(m.Value, 24, int(keyR*2-20))
+		c.centered(f, m.Value, int(x), int(y)+4+capHeight(f)/2, t.value)
+		c.centered(label, m.Short, int(x), int(y)+33, t.label)
 	}
-	c.disc(center, center, doneR, menuAccent)
-	c.centered(done, "Klaar", center, center+capHeight(done)/2, menuInk)
+	c.disc(center, center, doneR, t.done)
+	c.centered(done, "Klaar", center, center+capHeight(done)/2, t.doneText)
 }
 
 // drawPage is one setting on its own.
-func drawPage(c canvas, m core.Setting, address string) {
-	title := comic(true, 26)
-	if title == nil {
+func drawPage(c canvas, t theme, m core.Setting, address string) {
+	title, hint := comic(true, 26), comic(false, 16)
+	if title == nil || hint == nil {
 		return
 	}
-	c.centered(title, m.Label, center, 96, menuText)
+	c.centered(fitted(m.Label, 26, 330), m.Label, center, 98, t.title)
+	c.centered(hint, m.Hint, center, 128, t.hint)
 
 	switch m.Kind {
 	case core.Steps:
 		// How far along, on an arc open at the bottom like TECHO5's jog wheel.
 		const from, sweep = 225.0, 270.0
-		arc(c, 200, 212, from, sweep, menuKey)
+		arc(c, 200, 212, from, sweep, t.track)
 		if m.Index >= 0 && m.Steps > 1 {
-			arc(c, 200, 212, from, sweep*float64(m.Index)/float64(m.Steps-1), menuAccent)
+			arc(c, 200, 212, from, sweep*float64(m.Index)/float64(m.Steps-1), t.arc)
 		}
 		f := fitted(m.Value, 64, int(2*(stepX-stepR)-24))
-		c.centered(f, m.Value, center, int(pageY)+capHeight(f)/2, menuText)
+		c.centered(f, m.Value, center, int(pageY)+capHeight(f)/2, t.value)
 		first, last := m.Index == 0, m.Index == m.Steps-1
-		stepKey(c, center-stepX, false, first)
-		stepKey(c, center+stepX, true, last)
+		stepKey(c, t, center-stepX, false, first)
+		stepKey(c, t, center+stepX, true, last)
 	case core.Choice:
+		if m.ID == core.RowStyle {
+			styleChoices(c, t, m)
+			break
+		}
 		for i, dx := range []float64{-pickX, pickX} {
-			face, text := menuKey, menuText
+			face, text := t.key, t.keyText
 			if i == m.Index {
-				face, text = menuAccent, menuInk
+				face, text = t.chosen, t.chosenText
 			}
 			c.disc(center+dx, pageY, pickR, face)
 			f := fitted(m.Names[i], 28, int(pickR*2-20))
 			c.centered(f, m.Names[i], int(center+dx), int(pageY)+capHeight(f)/2, text)
 		}
 		if m.ID == core.RowSSH && address != "" {
-			c.centered(comic(false, 16), address, center, int(pageY+pickR)+30, menuDim)
+			c.centered(hint, address, center, int(pageY+pickR)+30, t.hint)
 		}
 	}
 
-	pill(c, center-pillW/2, center+pillW/2, pillY, pillH, menuAccent)
+	pill(c, center-pillW/2, center+pillW/2, pillY, pillH, t.done)
 	done := comic(true, 24)
-	c.centered(done, "Klaar", center, int(pillY)+capHeight(done)/2, menuInk)
+	c.centered(done, "Klaar", center, int(pillY)+capHeight(done)/2, t.doneText)
+}
+
+// styleChoices shows the clock's two looks as small clocks in their own colors, the one chosen ringed,
+// with its name under each: what is chosen is seen rather than read.
+func styleChoices(c canvas, t theme, m core.Setting) {
+	const r = pickR - 10
+	name := comic(true, 20)
+	for i, l := range []look{yellow, dark} {
+		x := center + []float64{-pickX, pickX}[i]
+		if i == m.Index {
+			c.ringAt(x, pageY, r+4, r+12, 0, 2*math.Pi, t.chosen)
+		} else {
+			c.ringAt(x, pageY, r+4, r+6, 0, 2*math.Pi, t.track)
+		}
+		c.disc(x, pageY, r, l.ground)
+		c.bar(x, pageY, x-26, pageY-15, 9, l.hourHand)   // ten past ten, the way clocks are shown
+		c.bar(x, pageY, x+30, pageY-30, 7, l.minuteHand) //
+		c.disc(x, pageY, 8, l.minuteHand)
+		c.disc(x, pageY, 3, l.peg)
+		col := t.title
+		if i == m.Index {
+			col = t.chosen
+		}
+		c.centered(name, m.Names[i], int(x), int(pageY+r)+40, col)
+	}
 }
 
 // stepKey is − or + as a round key, its sign drawn as bars rather than a glyph so it is the same
 // weight in any font; faded at the end it cannot go past.
-func stepKey(c canvas, x float64, plus, end bool) {
-	sign := menuText
+func stepKey(c canvas, t theme, x float64, plus, end bool) {
+	sign := t.sign
 	if end {
-		sign = menuDim
+		sign = t.signEnd
 	}
-	c.disc(x, pageY, stepR, menuKey)
+	c.disc(x, pageY, stepR, t.key)
 	const half, w = 17.0, 7.0
 	c.poly([][2]float64{{x - half, pageY - w/2}, {x + half, pageY - w/2}, {x + half, pageY + w/2}, {x - half, pageY + w/2}}, sign)
 	if plus {

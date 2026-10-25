@@ -31,6 +31,8 @@ const (
 	// saveAfter is how long the volume has to stay put before it is written down: a ramp on the
 	// buttons is one write, not thirty.
 	saveAfter = 3 * time.Second
+	// menuNightBrightness is the least the menu is lit at night, in percent.
+	menuNightBrightness = 15
 )
 
 // Clock is the screen and everything that reaches it.
@@ -142,9 +144,14 @@ func (c *Clock) frame(now time.Time) {
 		slog.Warn("kids: presenting a frame failed", "err", err)
 	}
 
+	// At night the menu is lit only enough to read, so a parent opening it in the dark does not light
+	// the room.
 	pct := s.Brightness
-	if sc.Night && !menu {
+	if sc.Night {
 		pct = s.NightBrightness
+		if menu {
+			pct = max(pct, menuNightBrightness)
+		}
 	}
 	if level := max(1, pct*screen.BacklightMax/100); level != c.light {
 		if err := screen.SetBacklight(level); err != nil {

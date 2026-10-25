@@ -19,16 +19,19 @@ func TestEveryScreenDraws(t *testing.T) {
 	s := core.Defaults()
 	menu := core.MenuSettings(s, core.Status{SSH: true, Address: "192.0.2.10"})
 	scenes := map[string]Scene{
-		"day":         {Now: now, Style: core.StyleYellow},
-		"day-volume":  {Now: now, Style: core.StyleYellow, ShowVolume: true, Volume: 12, MaxVolume: 20},
-		"dark":        {Now: now, Style: core.StyleDark},
-		"dark-volume": {Now: now, Style: core.StyleDark, ShowVolume: true, Volume: 12, MaxVolume: 20},
-		"night":       {Now: time.Date(2026, 10, 25, 21, 40, 0, 0, time.Local), Night: true},
-		"menu":        {Now: now, Menu: menu, Editing: -1},
-		"menu-volume": {Now: now, Menu: menu, Editing: 0},
-		"menu-bed":    {Now: now, Menu: menu, Editing: 4},
-		"menu-style":  {Now: now, Menu: menu, Editing: 3},
-		"menu-ssh":    {Now: now, Menu: menu, Editing: 6, Address: "192.0.2.10"},
+		"day":             {Now: now, Style: core.StyleYellow},
+		"day-volume":      {Now: now, Style: core.StyleYellow, ShowVolume: true, Volume: 12, MaxVolume: 20},
+		"dark":            {Now: now, Style: core.StyleDark},
+		"dark-volume":     {Now: now, Style: core.StyleDark, ShowVolume: true, Volume: 12, MaxVolume: 20},
+		"night":           {Now: time.Date(2026, 10, 25, 21, 40, 0, 0, time.Local), Night: true},
+		"menu":            {Now: now, Menu: menu, Editing: -1},
+		"menu-volume":     {Now: now, Menu: menu, Editing: 0},
+		"menu-bed":        {Now: now, Menu: menu, Editing: 4},
+		"menu-style":      {Now: now, Menu: menu, Editing: 3},
+		"menu-ssh":        {Now: now, Menu: menu, Editing: 6, Address: "192.0.2.10"},
+		"menu-dark":       {Now: now, Style: core.StyleDark, Menu: menu, Editing: -1},
+		"menu-dark-bed":   {Now: now, Style: core.StyleDark, Menu: menu, Editing: 4},
+		"menu-dark-style": {Now: now, Style: core.StyleDark, Menu: core.MenuSettings(core.Settings{Style: core.StyleDark}.Normalized(), core.Status{}), Editing: 3},
 	}
 	dir := os.Getenv("KIDS_PREVIEW")
 	for name, sc := range scenes {

@@ -19,7 +19,7 @@ import (
 // look is one way of coloring the clock.
 type look struct {
 	ground, rim                     color.RGBA
-	hours, minutes                  color.RGBA
+	hours, minutes, dots            color.RGBA // the hour numbers, the minute numbers, the dots between
 	hourHand, minuteHand, peg       color.RGBA
 	edge                            color.RGBA // round the numbers and hands; none if A is 0
 	shadow                          color.RGBA // under the hands; none if A is 0
@@ -30,23 +30,25 @@ type look struct {
 var (
 	yellow = look{
 		ground: rgb(255, 208, 36), rim: rgb(255, 228, 120),
-		hours: rgb(228, 36, 32), minutes: rgb(26, 56, 72),
+		hours: rgb(228, 36, 32), minutes: rgb(26, 56, 72), dots: rgb(26, 56, 72),
 		hourHand: rgb(228, 36, 32), minuteHand: rgb(34, 66, 196), peg: rgb(86, 116, 230),
 		shadow:        color.RGBA{150, 100, 0, 70},
 		minuteNumbers: true,
 		volume:        rgb(34, 66, 196), volumeSpare: rgb(255, 240, 180), volumeOver: rgb(214, 160, 20),
 	}
+	// dark is the same clock on black, like the Spot's bezel: the classroom clock's three colors, each
+	// lifted until it reads on black without an outline - a coral red for the hours, the yellow for the
+	// minutes' numbers, a bright blue for the minute hand - and the rest left to the dark.
 	dark = look{
-		ground: rgb(0, 0, 0), rim: rgb(28, 30, 36),
-		hours: rgb(238, 44, 38), minutes: rgb(200, 208, 218),
-		hourHand: rgb(238, 44, 38), minuteHand: rgb(48, 104, 248), peg: rgb(150, 180, 255),
-		edge:          rgb(255, 255, 255),
+		ground: rgb(0, 0, 0), rim: rgb(16, 18, 24),
+		hours: rgb(255, 92, 76), minutes: rgb(255, 208, 36), dots: rgb(84, 90, 104),
+		hourHand: rgb(255, 92, 76), minuteHand: rgb(72, 134, 255), peg: rgb(255, 208, 36),
 		minuteNumbers: true,
-		volume:        rgb(48, 104, 248), volumeSpare: rgb(70, 74, 86), volumeOver: rgb(28, 30, 36),
+		volume:        rgb(72, 134, 255), volumeSpare: rgb(54, 58, 70), volumeOver: rgb(16, 18, 24),
 	}
 	// night is the prototype's night clock: the colors of a sky after dark, low enough to sleep by.
 	night = look{
-		hours: rgb(93, 104, 148), minutes: rgb(60, 70, 112),
+		hours: rgb(93, 104, 148), minutes: rgb(60, 70, 112), dots: rgb(60, 70, 112),
 		hourHand: rgb(154, 166, 214), minuteHand: rgb(117, 132, 192), peg: rgb(40, 50, 90),
 		volume: rgb(117, 132, 192), volumeSpare: rgb(44, 54, 96), volumeOver: rgb(24, 30, 60),
 	}
@@ -109,7 +111,7 @@ func dial(c canvas, l look, cx, cy, k float64) {
 			if i%5 == 0 {
 				r = 4 * k // the five-minute marks stand out when they carry no number
 			}
-			c.disc(x, y, r, l.minutes)
+			c.disc(x, y, r, l.dots)
 			continue
 		}
 		n := strconv.Itoa(i)

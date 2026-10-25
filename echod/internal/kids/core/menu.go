@@ -43,8 +43,9 @@ const (
 // Setting is one button on the menu as it stands.
 type Setting struct {
 	ID    string
-	Label string   // its name on its own page: "Max. volume"
-	Short string   // under its value on the ring: "volume"
+	Label string   // its name on its own page: "Maximaal volume"
+	Hint  string   // under that, what it does, for a parent who has not been here in a while
+	Short string   // under its value on the ring: "max. volume"
 	Value string   // the value now, as shown
 	Kind  Kind     //
 	Steps int      // how many steps there are (Steps), for drawing how far along it is
@@ -68,35 +69,40 @@ var (
 
 // MenuSettings is the menu's buttons, in their order round the ring.
 func MenuSettings(s Settings, st Status) []Setting {
-	style := Setting{ID: RowStyle, Label: "Klok", Short: "klok", Kind: Choice, Names: []string{"Geel", "Zwart"}}
+	style := Setting{ID: RowStyle, Label: "Klok", Hint: "hoe de klok eruitziet", Short: "klok",
+		Kind: Choice, Names: []string{"Geel", "Zwart"}}
 	style.Index = 0
 	if s.Style == StyleDark {
 		style.Index = 1
 	}
 	style.Value = style.Names[style.Index]
-	ssh := Setting{ID: RowSSH, Label: "SSH", Short: "ssh", Kind: Choice, Names: []string{"Uit", "Aan"}}
+	ssh := Setting{ID: RowSSH, Label: "SSH", Hint: "onderhoud op afstand", Short: "ssh",
+		Kind: Choice, Names: []string{"Uit", "Aan"}}
 	if st.SSH {
 		ssh.Index = 1
 	}
 	ssh.Value = ssh.Names[ssh.Index]
 	return []Setting{
-		ints(RowMaxVolume, "Max. volume", "volume", maxVolumes, s.MaxVolume, ""),
-		ints(RowBrightness, "Helderheid", "licht", brightness, s.Brightness, "%"),
-		ints(RowNightLight, "Nachtlicht", "nacht", nightLights, s.NightBrightness, "%"),
+		ints(RowMaxVolume, "Maximaal volume", "zo hard kunnen de kinderen hem zetten", "max. volume",
+			maxVolumes, s.MaxVolume, ""),
+		ints(RowBrightness, "Helderheid overdag", "hoe fel het scherm overdag is", "overdag",
+			brightness, s.Brightness, "%"),
+		ints(RowNightLight, "Helderheid 's nachts", "hoe fel de nachthemel is", "'s nachts",
+			nightLights, s.NightBrightness, "%"),
 		style,
-		times(RowBedtime, "Bedtijd", "bed", bedtimes, s.Bedtime),
-		times(RowWaketime, "Wektijd", "op", waketimes, s.Waketime),
+		times(RowBedtime, "Bedtijd", "vanaf dan de nachthemel", "bedtijd", bedtimes, s.Bedtime),
+		times(RowWaketime, "Opstaan", "vanaf dan weer de gewone klok", "opstaan", waketimes, s.Waketime),
 		ssh,
 	}
 }
 
-func ints(id, label, short string, steps []int, v int, unit string) Setting {
-	return Setting{ID: id, Label: label, Short: short, Value: strconv.Itoa(v) + unit, Kind: Steps,
+func ints(id, label, hint, short string, steps []int, v int, unit string) Setting {
+	return Setting{ID: id, Label: label, Hint: hint, Short: short, Value: strconv.Itoa(v) + unit, Kind: Steps,
 		Steps: len(steps), Index: slices.Index(steps, v)}
 }
 
-func times(id, label, short string, steps []string, v string) Setting {
-	return Setting{ID: id, Label: label, Short: short, Value: v, Kind: Steps,
+func times(id, label, hint, short string, steps []string, v string) Setting {
+	return Setting{ID: id, Label: label, Hint: hint, Short: short, Value: v, Kind: Steps,
 		Steps: len(steps), Index: slices.Index(steps, v)}
 }
 

@@ -4,10 +4,11 @@
 time when you tap it, and has no microphones, no camera and no assistant at all.**
 
 <p align="center">
-  <img src="../docs/kids/day.png" width="200" alt="The learning clock by day">
-  <img src="../docs/kids/night.png" width="200" alt="The night sky between bedtime and waketime">
-  <img src="../docs/kids/menu.png" width="200" alt="The parent menu">
-  <img src="../docs/kids/menu-setting.png" width="200" alt="A setting on its own page">
+  <img src="../docs/kids/day.png" width="180" alt="The learning clock by day">
+  <img src="../docs/kids/dark.png" width="180" alt="The learning clock on black">
+  <img src="../docs/kids/night.png" width="180" alt="The night sky between bedtime and waketime">
+  <img src="../docs/kids/menu.png" width="180" alt="The parent menu">
+  <img src="../docs/kids/menu-setting.png" width="180" alt="A setting on its own page">
 </p>
 
 This is a fork of [TECHO5](https://github.com/HuskerMinion/techo5), which frees old Echo devices from
@@ -18,16 +19,17 @@ speaker) and puts a different daemon on top: one made for a child's room.
 ## What it does
 
 - **A learning clock**, after the yellow one from the classroom: big red hour numbers and a red hour hand,
-  a ring of minute dots numbered every five up to 60 and a long blue minute hand. Also in black
-  (*Kids Dark*), with white edges.
+  a ring of minute dots numbered every five up to 60 and a long blue minute hand. Also on black, like
+  the Spot's bezel (*Kids Dark*), with the same three colors lifted to read on it.
 - **Tap it and it tells the time**, in Dutch for now: *"Het is tien voor half acht."* The top button
   does the same. The device has no text-to-speech, so it plays one clip per minute, rendered beforehand.
 - **Volume** from the buttons only (a swipe does nothing), never above the maximum a parent sets.
 - **Night**: between bedtime and waketime the screen is a dim night sky with a small clock.
 - **A parent menu**: hold both volume buttons for three seconds. Every setting is a large round button
-  (maximum volume, brightness, night light, clock style, bedtime, waketime, SSH) that opens on a page of
-  its own with big − and + keys, in the shapes of TECHO5's own round screens. It closes by itself when
-  it is left alone.
+  with an icon and its value (maximum volume, brightness by day and at night, the clock's look, bedtime,
+  waketime, SSH) that opens on a page of its own with big − and + keys and a line saying what it does,
+  in the shapes of TECHO5's own round screens and the clock's own colors. It closes by itself when it is
+  left alone.
 
 ## What it does not have
 

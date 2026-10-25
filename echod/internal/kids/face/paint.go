@@ -69,10 +69,15 @@ func (c canvas) disc(cx, cy, r float64, col color.RGBA) {
 // ring draws the ring between radii r0 and r1 about the middle, from angle a0 to a1 in radians
 // clockwise from twelve o'clock.
 func (c canvas) ring(r0, r1, a0, a1 float64, col color.RGBA) {
+	c.ringAt(center, center, r0, r1, a0, a1, col)
+}
+
+// ringAt is ring about any point.
+func (c canvas) ringAt(cx, cy, r0, r1, a0, a1 float64, col color.RGBA) {
 	full := a1-a0 >= 2*math.Pi-1e-9
-	for y := int(center - r1 - 1); y <= int(center+r1+1); y++ {
-		for x := int(center - r1 - 1); x <= int(center+r1+1); x++ {
-			dx, dy := float64(x)+0.5-center, float64(y)+0.5-center
+	for y := int(cy - r1 - 1); y <= int(cy+r1+1); y++ {
+		for x := int(cx - r1 - 1); x <= int(cx+r1+1); x++ {
+			dx, dy := float64(x)+0.5-cx, float64(y)+0.5-cy
 			d := math.Hypot(dx, dy)
 			if d < r0-1 || d > r1+1 {
 				continue
@@ -120,6 +125,18 @@ func (c canvas) poly(pts [][2]float64, col color.RGBA) {
 			c.blend(x, y, col, d+0.5)
 		}
 	}
+}
+
+// bar is a straight stroke w wide from one point to the other, with round ends.
+func (c canvas) bar(x0, y0, x1, y1, w float64, col color.RGBA) {
+	dx, dy := x1-x0, y1-y0
+	l := math.Hypot(dx, dy)
+	if l > 0 {
+		nx, ny := -dy/l*w/2, dx/l*w/2
+		c.poly([][2]float64{{x0 + nx, y0 + ny}, {x1 + nx, y1 + ny}, {x1 - nx, y1 - ny}, {x0 - nx, y0 - ny}}, col)
+	}
+	c.disc(x0, y0, w/2, col)
+	c.disc(x1, y1, w/2, col)
 }
 
 // centered draws s centered about x, its baseline at y.
