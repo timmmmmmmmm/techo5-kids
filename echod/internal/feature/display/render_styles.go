@@ -103,7 +103,7 @@ func (r *renderer) styledClock(s scene, style string) {
 		digits := image.Rect(box.Min.X, box.Min.Y+r.s(16), box.Max.X, box.Max.Y-r.s(76))
 		r.ledClock(s.now, digits, r.ampm)
 		r.styleDateUnder(s, box, box.Max.Y-r.s(8))
-	case styleAnalog:
+	case styleAnalog, styleKids, styleKidsDark:
 		r.analogStyle(s, box)
 		corner = r.cornered // in a corner it leaves the weather to the weather corner
 	case styleWords:

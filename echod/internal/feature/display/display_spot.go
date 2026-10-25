@@ -938,6 +938,12 @@ func (d *Display) gesture(g touch.Gesture) {
 			d.wake()
 			return
 		}
+		// The Kids clocks say the time rather than starting a turn (clock_say_spot.go).
+		if isKidsStyle(clockStyle()) {
+			sayTime(time.Now())
+			d.wake()
+			return
+		}
 		voice.Get().Action()
 	case touch.SwipeUp:
 		swipeVolume(+1)

@@ -39,6 +39,8 @@ const (
 	styleNixie     = "nixie"
 	styleStack     = "stack"
 	styleOverlap   = "overlap"
+	styleKids      = "kids"
+	styleKidsDark  = "kidsdark"
 )
 
 // clockStyles are the choices, as the screen and Home Assistant name them, with what the config keeps.
@@ -60,6 +62,8 @@ var clockStyles = []struct {
 	{"Nixie", styleNixie},
 	{"Stack", styleStack},
 	{"Overlap", styleOverlap},
+	{"Kids", styleKids},
+	{"Kids Dark", styleKidsDark},
 }
 
 func clockStyleIndex() int {

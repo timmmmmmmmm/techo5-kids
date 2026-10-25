@@ -67,6 +67,8 @@ func (r *roundRenderer) styledClockFace(s roundScene, style string) {
 		r.ledFace(s)
 	case styleAnalog:
 		r.analogFace(s)
+	case styleKids, styleKidsDark:
+		r.kidsClockFace(s, style)
 	case styleWords:
 		r.wordsFace(s)
 	case styleSun:

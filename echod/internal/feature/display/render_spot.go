@@ -504,6 +504,8 @@ func (r *roundRenderer) rim(s roundScene) {
 		r.arc(rimIn, rimOut, 0, 2*math.Pi*math.Min(math.Max(left, 0), 1), colTimer)
 	case s.style.style() == styleSun && s.style.sunOK && s.phase == "idle" && !s.nowPlaying && !s.showCamera && !s.showDash:
 		r.sunRim(s)
+	case isKidsStyle(s.style.style()) && s.phase == "idle" && !s.nowPlaying && !s.showCamera && !s.showDash:
+		r.arc(rimIn, rimOut, 0, 2*math.Pi, kidsLooks[s.style.style()].rim)
 	default:
 		r.arc(rimIn, rimOut, 0, 2*math.Pi, colTrack)
 	}
