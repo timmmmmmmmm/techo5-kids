@@ -6,7 +6,7 @@ import (
 )
 
 // The children playing clockmaker. A finger takes a hand and turns it, and the clock stays where they
-// leave it for a while, then walks back to the real time with a little bounce that says it is itself
+// leave it for a while, then walks back to the real time with a small nod that says it is itself
 // again. These are the rules, in times and angles alone; the fingers are the clock service's
 // (clock.go), which keeps all of this behind its mutex.
 
@@ -32,9 +32,8 @@ const (
 	// PlayIdle is how long the clock stays where the children left it before walking back.
 	PlayIdle = 10 * time.Second
 
-	// PlayBack is how long that walk back takes: long enough to read as a turn, at the frame rate
-	// the Spot draws.
-	PlayBack = 1500 * time.Millisecond
+	// playBackMost is the longest the walk home takes, however far it is.
+	playBackMost = 2500 * time.Millisecond
 )
 
 // playState is where the play is.
@@ -49,13 +48,14 @@ const (
 
 // Play is the clock the children set by hand. Zero is the real clock, showing nothing of its own.
 type Play struct {
-	state  playState
-	held   Hand
-	anchor time.Time    // where the turning started: the time shown when the hand was taken, on the minute
-	turned time.Duration // how far the finger has turned it from the anchor
-	finger float64       // the finger's angle at the last drag, in turns: 0 at twelve, going clockwise
-	idle   time.Time     // playSet: when the hands were let go
-	backAt time.Time     // playBack: when the walk back began
+	state   playState
+	held    Hand
+	anchor  time.Time    // where the turning started: the time shown when the hand was taken, on the minute
+	turned  time.Duration // how far the finger has turned it from the anchor
+	finger  float64       // the finger's angle at the last drag, in turns: 0 at twelve, going clockwise
+	idle    time.Time     // playSet: when the hands were let go
+	backAt  time.Time     // playBack: when the walk back began
+	backDur time.Duration // and how long it takes: a short way home is a moment, a long one takes its time
 }
 
 // Grab takes hand at the finger's angle, from the time shown now. A hand of none takes nothing.
@@ -65,7 +65,7 @@ func (p *Play) Grab(hand Hand, shown time.Time, finger float64) {
 	}
 	p.state, p.held = playHeld, hand
 	p.anchor, p.turned, p.finger = shown.Round(time.Minute), 0, finger
-	p.idle, p.backAt = time.Time{}, time.Time{}
+	p.idle, p.backAt, p.backDur = time.Time{}, time.Time{}, 0
 }
 
 // Drag turns the held hand to the finger's angle, taking up the turn since the last one: a hand may
@@ -88,12 +88,26 @@ func (p *Play) Release(now time.Time) {
 	p.state, p.idle = playSet, now
 }
 
+// Set says whether the children's time stands, left alone and waiting to walk home.
+func (p *Play) Set() bool {
+	return p.state == playSet
+}
+
 // Touch is a tap while the children's time stands: hearing it counts as playing, so it stays a while
 // longer.
 func (p *Play) Touch(now time.Time) {
 	if p.state == playSet {
 		p.idle = now
 	}
+}
+
+// SendHome starts the walk back at once, wherever the hands are: the second tap of a pair, a child
+// saying "done". While the hands are held it does nothing.
+func (p *Play) SendHome(now time.Time) {
+	if p.state != playSet {
+		return
+	}
+	p.walkHome(now)
 }
 
 // Cancel ends the play at once, wherever it is: the real clock again. The parent menu wants the
@@ -110,14 +124,14 @@ func (p *Play) Held() Hand {
 	return p.held
 }
 
-// Playing says whether the clock shows the children's time, or is walking back to the real one.
-func (p *Play) Playing() bool {
-	return p.state != playOff
-}
-
 // Turned is how far the held hand has been turned. A grab that never turned anything was no grab.
 func (p *Play) Turned() bool {
 	return p.turned != 0
+}
+
+// Playing says whether the clock shows the children's time, or is walking back to the real one.
+func (p *Play) Playing() bool {
+	return p.state != playOff
 }
 
 // Tick advances the play to the real time now: a time left alone walks back, and the walk ends. It
@@ -125,18 +139,41 @@ func (p *Play) Turned() bool {
 func (p *Play) Tick(now time.Time) bool {
 	switch {
 	case p.state == playSet && now.Sub(p.idle) >= PlayIdle:
-		p.state, p.backAt = playBack, now
-	case p.state == playBack && now.Sub(p.backAt) >= PlayBack:
+		p.walkHome(now)
+	case p.state == playBack && now.Sub(p.backAt) >= p.backDur:
 		p.state = playOff
 	}
 	return p.state == playBack
 }
 
-// playBounce eases the walk back: quickly away, a little past the real time, settling. u runs 0 to 1.
+// walkHome starts the walk back to the real time, the shorter way round the dial.
+func (p *Play) walkHome(now time.Time) {
+	p.state, p.backAt = playBack, now
+	p.backDur = playBackDur(shortestWay(now.Sub(p.anchor.Add(p.turned))))
+}
+
+// shortestWay is the way home from the children's time, the shorter way round the twelve-hour dial.
+func shortestWay(way time.Duration) time.Duration {
+	for way > 6*time.Hour {
+		way -= 12 * time.Hour
+	}
+	for way <= -6*time.Hour {
+		way += 12 * time.Hour
+	}
+	return way
+}
+
+// playBackDur is how long the walk home takes: a moment for a short way, longer for a long one, so
+// the hands never have to hurry.
+func playBackDur(way time.Duration) time.Duration {
+	d := 600*time.Millisecond + time.Duration(math.Abs(way.Hours())*float64(180*time.Millisecond))
+	return min(d, playBackMost)
+}
+
+// playBounce eases the walk home: gently to speed, gently to rest, and a small nod past the real
+// time just before it settles. u runs 0 to 1.
 func playBounce(u float64) float64 {
-	const c1 = 0.9 // wider is a bigger bounce; 1.7, the usual back, lands a tenth of the way past
-	u--
-	return 1 + (c1+1)*u*u*u + c1*u*u
+	return u*u*(3-2*u) + 0.5*u*u*u*(1-u)
 }
 
 // Shown is the time the clock shows at the real time now: the children's while they play, the real
@@ -147,14 +184,8 @@ func (p *Play) Shown(now time.Time) time.Time {
 		return p.anchor.Add(p.turned).Round(time.Minute)
 	case playBack:
 		set := p.anchor.Add(p.turned)
-		way := now.Sub(set)
-		for way > 6*time.Hour { // the dial is twelve hours round: the short way home
-			way -= 12 * time.Hour
-		}
-		for way <= -6*time.Hour {
-			way += 12 * time.Hour
-		}
-		u := float64(now.Sub(p.backAt)) / float64(PlayBack)
+		way := shortestWay(now.Sub(set))
+		u := float64(now.Sub(p.backAt)) / float64(p.backDur)
 		return set.Add(time.Duration(float64(way) * playBounce(u)))
 	}
 	return now

@@ -41,6 +41,10 @@ const (
 	// tap arrives as a hold and a drag instead, and the clock says the time for it all the same.
 	tapLikeHold = 500 * time.Millisecond
 	tapLikeMove = 40
+
+	// tapAgain is how close two taps must be to be a pair: the second of one, on the children's
+	// clock, sends it home.
+	tapAgain = 350 * time.Millisecond
 )
 
 // Clock is the screen and everything that reaches it.
@@ -59,6 +63,7 @@ type Clock struct {
 	playPrev  core.Play   // the play before the finger took a hand, for a release that was a tap
 	holdX, holdY  int     // where the finger went down
 	holdAt        time.Time
+	lastTap       time.Time // the tap before this one, for pairs
 	soon          *time.Timer // a frame of the walk back, asked for
 
 	dev   *screen.Device
@@ -222,8 +227,15 @@ func (c *Clock) gesture(g touch.Gesture) {
 	say, hand := time.Time{}, core.HandNone
 	switch g.Kind {
 	case touch.Tap:
-		c.play.Touch(now)
-		say = c.play.Shown(now)
+		if c.play.Set() && now.Sub(c.lastTap) < tapAgain {
+			// The second tap of a pair on the children's clock: done playing, home at once.
+			c.play.SendHome(now)
+			slog.Info("kids: a second tap sends the clock home")
+		} else {
+			c.play.Touch(now)
+			say = c.play.Shown(now)
+		}
+		c.lastTap = now
 	case touch.Hold:
 		c.holdX, c.holdY, c.holdAt, c.playPrev = g.X, g.Y, now, c.play
 		hand = face.HandAt(sc, g.X, g.Y)
@@ -241,6 +253,7 @@ func (c *Clock) gesture(g touch.Gesture) {
 		if now.Sub(c.holdAt) < tapLikeHold && abs(g.X-c.holdX) <= tapLikeMove && abs(g.Y-c.holdY) <= tapLikeMove {
 			c.play, say = c.playPrev, c.playPrev.Shown(now)
 			c.play.Touch(now)
+			c.lastTap = now
 		} else if c.play.Held() != core.HandNone && !c.play.Turned() {
 			c.play = c.playPrev
 		} else {

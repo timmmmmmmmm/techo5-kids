@@ -41,24 +41,33 @@ func Draw(dst *image.RGBA, s Scene) {
 		drawMenu(c, s)
 		return
 	case s.Night:
-		draw.Draw(dst, dst.Rect, background("night", nightSky), image.Point{}, draw.Src)
-		volumeRim(c, night, s)
+		bg, key := nightSky, "night"
 		if s.Playing {
-			playDots(c)
+			bg, key = func(c canvas) {
+				nightSky(c)
+				playFace(c, night, nightX, nightY, nightK)
+			}, "night-play"
 		}
+		draw.Draw(dst, dst.Rect, background(key, bg), image.Point{}, draw.Src)
+		volumeRim(c, night, s)
 		hands(c, night, s.Now, nightX, nightY, nightK)
 	default:
 		l := yellow
 		if s.Style == core.StyleDark {
 			l = dark
 		}
-		draw.Draw(dst, dst.Rect, background(s.Style, func(c canvas) {
-			c.fill(l.ground)
+		bg, key := func(c canvas) { c.fill(l.ground) }, s.Style
+		if s.Playing {
+			bg, key = func(c canvas) {
+				c.fill(bezel)
+				playFace(c, l, center, center, 1)
+			}, s.Style+"-play"
+		}
+		draw.Draw(dst, dst.Rect, background(key, func(c canvas) {
+			bg(c)
 			dial(c, l, center, center, 1)
 		}), image.Point{}, draw.Src)
-		if s.Playing {
-			playRim(c, l)
-		} else {
+		if !s.Playing {
 			c.ring(rimIn, rimOut, 0, 2*math.Pi, l.rim)
 		}
 		volumeRim(c, l, s)
@@ -66,28 +75,27 @@ func Draw(dst *image.RGBA, s Scene) {
 	}
 }
 
-// playRim is the rim while the children's time is shown: the ring dashed, in the minutes' own color,
-// so anyone can see at a glance that the hands are not the real clock's — on the day's yellow as on
-// the black. Each dash is a little trapezoid along the ring; the whole rim is a couple dozen of them,
-// which the scan of a real arc would not have been.
-func playRim(c canvas, l look) {
-	const dashes = 24
-	for i := range dashes {
-		a := float64(i) / dashes
-		x0, y0 := at(center, center, rimIn+3, a)
-		x1, y1 := at(center, center, rimOut-3, a)
-		x2, y2 := at(center, center, rimOut-3, a+0.55/dashes)
-		x3, y3 := at(center, center, rimIn+3, a+0.55/dashes)
-		c.poly([][2]float64{{x0, y0}, {x1, y1}, {x2, y2}, {x3, y3}}, l.minutes)
-	}
-}
+// bezel is the black of the Spot's own ring round the panel: what shows between the kartelled face
+// and the edge of the glass falls away into it.
+var bezel = rgb(0, 0, 0)
 
-// playDots is the night's version: twelve quiet dots round the small clock, a ring the child knows
-// as the minutes' own, saying the same.
-func playDots(c canvas) {
-	for h := range 12 {
-		x, y := at(nightX, nightY, minuteRing*nightK+9, float64(h)/12)
-		c.disc(x, y, 2.4, night.minutes)
+// playFace is the face while the children's time is shown: a little smaller and with its edge
+// kartelled — sixty teeth out to where the rim was — so the clock looks taken apart until it is
+// itself again. On the yellow the teeth are the ground and the face reads as a gear; on black they
+// are the minutes' yellow and read as a crown round the dial. It is part of the background, drawn
+// once and kept, for it shows on every frame of a play.
+func playFace(c canvas, l look, cx, cy, k float64) {
+	const face, tip = 218.0, 236.0 // from just outside the minutes out to the rim
+	if l.ground.A > 0 {
+		c.disc(cx, cy, face*k, l.ground)
+	}
+	for i := range 60 {
+		a := float64(i)/60 - 0.004 // a tooth's half width, in turns
+		x0, y0 := at(cx, cy, face*k, a)
+		x1, y1 := at(cx, cy, face*k, a+0.008)
+		x2, y2 := at(cx, cy, tip*k, a+0.008)
+		x3, y3 := at(cx, cy, tip*k, a)
+		c.poly([][2]float64{{x0, y0}, {x1, y1}, {x2, y2}, {x3, y3}}, l.tooth)
 	}
 }
 

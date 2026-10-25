@@ -38,12 +38,13 @@ func BenchmarkTheHands(b *testing.B) {
 	}
 }
 
-func BenchmarkThePlayRim(b *testing.B) {
+func BenchmarkThePlayFace(b *testing.B) {
 	_, img := benchScene()
 	c := canvas{img}
 	b.ResetTimer()
 	for range b.N {
-		playRim(c, yellow)
+		c.fill(bezel)
+		playFace(c, yellow, center, center, 1)
 	}
 }
 

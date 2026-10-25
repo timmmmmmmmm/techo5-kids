@@ -24,9 +24,11 @@ speaker) and puts a different daemon on top: one made for a child's room.
 - **Tap it and it tells the time**, in Dutch for now: *"Het is tien voor half acht."* The top button
   does the same. The device has no text-to-speech, so it plays one clip per minute, rendered beforehand.
 - **Take a hand and turn it**: a finger on the blue or the red hand takes it, and the clock follows
-  forward or back, the hours riding along as on the real one. The rim turns to dashes while the hands
-  are not the real clock's, a tap tells the time the children set, and after ten seconds on its own
-  the clock turns back to the real time with a small bounce.
+  forward or back, the hours riding along as on the real one. While the hands are not the real
+  clock's the face is kartelled — its edge turned to sixty teeth over the bezel's own black — and a
+  tap tells the time the children set. A second tap sends it home, and left alone it walks back by
+  itself after ten seconds, the short way round the dial, unhurried and with a small nod as it
+  arrives.
 - **Volume** from the buttons only (a swipe does nothing), never above the maximum a parent sets.
 - **Night**: between bedtime and waketime the screen is a dim night sky with a small clock.
 - **A parent menu**: hold both volume buttons for three seconds. Every setting is a large round button

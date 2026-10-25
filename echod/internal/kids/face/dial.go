@@ -25,6 +25,7 @@ type look struct {
 	shadow                          color.RGBA // under the hands; none if A is 0
 	minuteNumbers                   bool       // the 5 … 60 ring, or dots alone
 	volume, volumeSpare, volumeOver color.RGBA // the rim while the volume is shown: set, allowed, not allowed
+	tooth                           color.RGBA // the teeth of the play marker, the kartelled edge
 }
 
 var (
@@ -35,6 +36,7 @@ var (
 		shadow:        color.RGBA{150, 100, 0, 70},
 		minuteNumbers: true,
 		volume:        rgb(34, 66, 196), volumeSpare: rgb(255, 240, 180), volumeOver: rgb(214, 160, 20),
+		tooth:         rgb(255, 208, 36), // the face's own yellow, so the teeth read as its edge
 	}
 	// dark is the same clock on black, like the Spot's bezel: the classroom clock's three colors, each
 	// lifted until it reads on black without an outline - a coral red for the hours, the yellow for the
@@ -45,12 +47,14 @@ var (
 		hourHand: rgb(255, 92, 76), minuteHand: rgb(72, 134, 255), peg: rgb(255, 208, 36),
 		minuteNumbers: true,
 		volume:        rgb(72, 134, 255), volumeSpare: rgb(54, 58, 70), volumeOver: rgb(16, 18, 24),
+		tooth:         rgb(255, 208, 36), // the minutes' yellow, a crown round the black dial
 	}
 	// night is the prototype's night clock: the colors of a sky after dark, low enough to sleep by.
 	night = look{
 		hours: rgb(93, 104, 148), minutes: rgb(60, 70, 112), dots: rgb(60, 70, 112),
 		hourHand: rgb(154, 166, 214), minuteHand: rgb(117, 132, 192), peg: rgb(40, 50, 90),
 		volume: rgb(117, 132, 192), volumeSpare: rgb(44, 54, 96), volumeOver: rgb(24, 30, 60),
+		tooth:  rgb(60, 70, 112), // quiet teeth, like the minutes' dots
 	}
 )
 

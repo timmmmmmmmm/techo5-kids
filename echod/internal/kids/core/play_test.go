@@ -50,35 +50,56 @@ func TestTheChildrenTurnTheClock(t *testing.T) {
 	if !p.Tick(now.Add(10 * time.Second)) {
 		t.Fatal("the clock did not walk back at ten seconds")
 	}
-	if got := p.Shown(now.Add(10*time.Second + PlayBack/2)); got.After(at("15:02")) {
+	dur := p.backDur
+	if got := p.Shown(now.Add(10*time.Second + dur/2)); got.After(at("15:02")) {
 		t.Errorf("midway home it shows %v, want on the way back from 15:02", got)
 	}
-	if p.Tick(now.Add(10*time.Second + PlayBack)) {
+	if p.Tick(now.Add(10*time.Second + dur)) {
 		t.Error("the walk back never ended")
 	}
-	end := now.Add(10*time.Second + PlayBack)
+	end := now.Add(10*time.Second + dur)
 	if got := p.Shown(end); !got.Equal(end) {
 		t.Errorf("after the walk it shows %v, want the real time", got)
 	}
 }
 
-// TestTheWalkBackBounces checks the bounce: past the real time, then settling on it.
-func TestTheWalkBackBounces(t *testing.T) {
+// TestTheWalkBackNods checks the nod: a little past the real time, then settling on it.
+func TestTheWalkBackNods(t *testing.T) {
 	var p Play
 	now := at("10:00")
 	p.Grab(HandMinute, now, 0)
 	p.Drag(-0.25) // 09:45, a quarter to
 	p.Release(now)
 	p.Tick(now.Add(PlayIdle))
-	// Somewhere on the way the hands stand beyond the real time: the bounce.
+	// Somewhere near the end the hands stand just beyond the real time: the nod.
 	beyond := false
-	for d := time.Duration(0); d <= PlayBack; d += PlayBack / 20 {
+	for d := time.Duration(0); d <= p.backDur; d += p.backDur / 20 {
 		if p.Shown(now.Add(PlayIdle + d)).After(now.Add(PlayIdle + d)) {
 			beyond = true
 		}
 	}
 	if !beyond {
-		t.Error("the walk back never passes the real time: no bounce")
+		t.Error("the walk back never passes the real time: no nod")
+	}
+	// And the hands are never far past it: the walk is calm, not a whip.
+	for d := time.Duration(0); d <= p.backDur; d += p.backDur / 20 {
+		if got := p.Shown(now.Add(PlayIdle + d)).Sub(now.Add(PlayIdle + d)); got > 2*time.Minute {
+			t.Errorf("the hands swing %v past the real time: too far", got)
+		}
+	}
+}
+
+// TestTheWalkTakesItsTime checks the walk's length: a short way home is a moment, a long one takes
+// its time, so the hands never have to hurry.
+func TestTheWalkTakesItsTime(t *testing.T) {
+	if d := playBackDur(15 * time.Minute); d > 700*time.Millisecond {
+		t.Errorf("a quarter of an hour takes %v, want a moment", d)
+	}
+	if d := playBackDur(6 * time.Hour); d < 1500*time.Millisecond {
+		t.Errorf("half the dial takes %v, want its time", d)
+	}
+	if d := playBackDur(30 * time.Hour); d > playBackMost {
+		t.Errorf("a nonsense way takes %v, want at most %v", d, playBackMost)
 	}
 }
 
@@ -99,7 +120,7 @@ func TestTheWalkTakesTheShortWayHome(t *testing.T) {
 	p.Release(now)
 	later := now.Add(PlayIdle)
 	p.Tick(later)
-	got := p.Shown(later.Add(PlayBack / 2))
+	got := p.Shown(later.Add(p.backDur / 2))
 	if !got.After(played) || got.Sub(played) > 5*time.Hour+time.Minute {
 		t.Errorf("the long way home: midway it shows %v, want most of five hours past 03:00", got)
 	}
@@ -137,6 +158,35 @@ func TestATapKeepsThePlayedClock(t *testing.T) {
 	}
 }
 
+// TestASecondTapSendsItHome: while the children's time stands, a tap tells it, and the next tap of a
+// pair starts the walk back at once.
+func TestASecondTapSendsItHome(t *testing.T) {
+	var p Play
+	now := at("14:20")
+	p.Grab(HandMinute, now, 0)
+	p.Drag(0.25)
+	p.Release(now)
+	later := now.Add(2 * time.Second)
+	p.SendHome(later)
+	if !p.Tick(later) {
+		t.Error("the second tap did not start the walk home")
+	}
+	if got := p.Shown(later); got.Equal(at("14:20")) || got.Equal(later) {
+		t.Errorf("the walk shows %v, want on its way home", got)
+	}
+	if p.Tick(later.Add(p.backDur)) {
+		t.Error("the walk back never ended")
+	}
+	if got := p.Shown(later.Add(p.backDur)); !got.Equal(later.Add(p.backDur)) {
+		t.Errorf("after the walk it shows %v, want the real time", got)
+	}
+	// A second tap with nothing standing does nothing.
+	p.SendHome(later.Add(p.backDur))
+	if p.Tick(later.Add(p.backDur + time.Hour)) {
+		t.Error("a send home from nowhere started a walk")
+	}
+}
+
 // TestNothingTakenHoldsNothing: a hand of none takes nothing, and a drag with nothing held does
 // nothing.
 func TestNothingTakenHoldsNothing(t *testing.T) {
@@ -158,7 +208,7 @@ func TestCancelEndsThePlayAtOnce(t *testing.T) {
 	var p Play
 	now := at("14:20")
 	p.Grab(HandMinute, now, 0)
-	p.Drag(0.5)
+	p.Drag(0.25)
 	p.Cancel()
 	if p.Tick(now.Add(time.Hour)) || !p.Shown(now).Equal(now) {
 		t.Errorf("cancelled, but the play is %+v", p)
