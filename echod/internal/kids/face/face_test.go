@@ -3,6 +3,7 @@ package face
 import (
 	"image"
 	"image/png"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,14 +17,18 @@ import (
 func TestEveryScreenDraws(t *testing.T) {
 	now := time.Date(2026, 10, 25, 14, 7, 38, 0, time.Local)
 	s := core.Defaults()
-	rows := core.MenuRows(s, core.Status{SSH: true, Address: "192.0.2.10"})
+	menu := core.MenuSettings(s, core.Status{SSH: true, Address: "192.0.2.10"})
 	scenes := map[string]Scene{
 		"day":         {Now: now, Style: core.StyleYellow},
 		"day-volume":  {Now: now, Style: core.StyleYellow, ShowVolume: true, Volume: 12, MaxVolume: 20},
 		"dark":        {Now: now, Style: core.StyleDark},
 		"dark-volume": {Now: now, Style: core.StyleDark, ShowVolume: true, Volume: 12, MaxVolume: 20},
 		"night":       {Now: time.Date(2026, 10, 25, 21, 40, 0, 0, time.Local), Night: true},
-		"menu":        {Now: now, Menu: rows, Address: "192.0.2.10"},
+		"menu":        {Now: now, Menu: menu, Editing: -1},
+		"menu-volume": {Now: now, Menu: menu, Editing: 0},
+		"menu-bed":    {Now: now, Menu: menu, Editing: 4},
+		"menu-style":  {Now: now, Menu: menu, Editing: 3},
+		"menu-ssh":    {Now: now, Menu: menu, Editing: 6, Address: "192.0.2.10"},
 	}
 	dir := os.Getenv("KIDS_PREVIEW")
 	for name, sc := range scenes {
@@ -55,17 +60,49 @@ func colors(img *image.RGBA) int {
 	return len(seen)
 }
 
-func TestATapOnAMenuRowFindsIt(t *testing.T) {
-	n := len(core.MenuRows(core.Defaults(), core.Status{}))
-	for i := range n {
-		y := menuTop + i*menuRow
-		for _, dy := range []int{-menuRow/2 + 1, 0, menuRow/2 - 1} {
-			if got := MenuRowAt(y+dy, n); got != i {
-				t.Errorf("y %d: row %d, want %d", y+dy, got, i)
-			}
+func TestEveryButtonIsWhereItIsDrawn(t *testing.T) {
+	menu := core.MenuSettings(core.Defaults(), core.Status{})
+	if got := MenuTarget(center, center, menu, -1); got.Kind != TargetDone {
+		t.Errorf("the middle of the ring is %v, want Klaar", got)
+	}
+	for i := range menu {
+		x, y := keyAt(i, len(menu))
+		if got := MenuTarget(int(x), int(y), menu, -1); got != (Target{TargetOpen, i}) {
+			t.Errorf("setting %d's button is %v", i, got)
 		}
 	}
-	if MenuRowAt(menuTop-menuRow, n) != -1 || MenuRowAt(menuTop+n*menuRow, n) != -1 {
-		t.Error("a tap above or below the list hits a row")
+	if got := MenuTarget(5, 5, menu, -1); got.Kind != TargetNone {
+		t.Errorf("a corner is %v", got)
+	}
+	steps, choice := 0, 3 // max volume, the clock's style
+	for _, c := range []struct {
+		x, y    float64
+		editing int
+		want    Target
+	}{
+		{center - stepX, pageY, steps, Target{Kind: TargetMinus}},
+		{center + stepX, pageY, steps, Target{Kind: TargetPlus}},
+		{center, pillY, steps, Target{Kind: TargetDone}},
+		{center, pageY, steps, Target{}},
+		{center - pickX, pageY, choice, Target{TargetPick, 0}},
+		{center + pickX, pageY, choice, Target{TargetPick, 1}},
+		{center, pillY, choice, Target{Kind: TargetDone}},
+	} {
+		if got := MenuTarget(int(c.x), int(c.y), menu, c.editing); got != c.want {
+			t.Errorf("page %d at %v,%v: %v, want %v", c.editing, c.x, c.y, got, c.want)
+		}
+	}
+}
+
+// TestNoTwoButtonsTouch keeps the ring's buttons apart by more than the slop a tap is allowed.
+func TestNoTwoButtonsTouch(t *testing.T) {
+	n := len(core.MenuSettings(core.Defaults(), core.Status{}))
+	x0, y0 := keyAt(0, n)
+	x1, y1 := keyAt(1, n)
+	if gap := math.Hypot(x1-x0, y1-y0) - 2*keyR; gap < 2*tapSlop {
+		t.Errorf("neighbours %0.f px apart, want at least %0.f", gap, 2*tapSlop)
+	}
+	if gap := ringR - keyR - doneR; gap < 2*tapSlop {
+		t.Errorf("the ring is %0.f px from Klaar, want at least %0.f", gap, 2*tapSlop)
 	}
 }

@@ -38,6 +38,7 @@ type Clock struct {
 	mu       sync.Mutex
 	set      core.Settings
 	menu     bool      // the parent menu is up
+	editing  int       // the setting open on its own page, -1 for the ring
 	menuAt   time.Time // and was last touched
 	volumeAt time.Time // the volume last changed
 	chord    *time.Timer
@@ -56,7 +57,7 @@ var (
 
 // Get is the clock. There is one screen.
 func Get() *Clock {
-	once.Do(func() { shared = &Clock{poke: make(chan struct{}, 1), light: -1} })
+	once.Do(func() { shared = &Clock{poke: make(chan struct{}, 1), light: -1, editing: -1} })
 	return shared
 }
 
@@ -122,17 +123,18 @@ func (c *Clock) wake() {
 func (c *Clock) frame(now time.Time) {
 	c.mu.Lock()
 	if c.menu && now.Sub(c.menuAt) > core.MenuIdle {
-		c.menu = false
+		c.menu, c.editing = false, -1
 		slog.Info("kids: parent menu closed, left alone")
 	}
 	s, menu := c.set, c.menu
 	sc := face.Scene{
-		Now: now, Style: s.Style, Night: s.Night(now),
+		Now: now, Style: s.Style, Night: s.Night(now), Editing: c.editing,
 		Volume: s.Volume, MaxVolume: s.MaxVolume, ShowVolume: now.Sub(c.volumeAt) < volumeShows,
 	}
 	c.mu.Unlock()
 	if menu {
-		sc.Menu, sc.Address = core.MenuRows(s, status()), address()
+		st := status()
+		sc.Menu, sc.Address = core.MenuSettings(s, st), st.Address
 	}
 
 	face.Draw(c.dev.Canvas(), sc)
@@ -163,18 +165,14 @@ func (c *Clock) gesture(g touch.Gesture) {
 	c.mu.Unlock()
 	if menu {
 		if g.Kind == touch.Tap {
-			c.menuTap(g.Y)
+			c.menuTap(g.X, g.Y)
 		}
 		c.wake()
 		return
 	}
-	switch g.Kind {
-	case touch.Tap:
+	// Only a tap: the volume is the buttons' alone, so a swipe across the clock does nothing.
+	if g.Kind == touch.Tap {
 		sayTime(time.Now(), c.settings().Language)
-	case touch.SwipeUp:
-		c.stepVolume(+1)
-	case touch.SwipeDown:
-		c.stepVolume(-1)
 	}
 }
 
@@ -225,7 +223,7 @@ func (c *Clock) chordDue() {
 	c.mu.Lock()
 	c.chord = nil
 	if due {
-		c.menu, c.menuAt = !c.menu, time.Now()
+		c.menu, c.editing, c.menuAt = !c.menu, -1, time.Now()
 		slog.Info("kids: parent menu", "open", c.menu)
 	}
 	c.mu.Unlock()
@@ -235,33 +233,43 @@ func (c *Clock) chordDue() {
 	}
 }
 
-// menuTap is a tap in the parent menu at height y.
-func (c *Clock) menuTap(y int) {
+// menuTap is a tap in the parent menu at x, y.
+func (c *Clock) menuTap(x, y int) {
 	c.mu.Lock()
-	rows := core.MenuRows(c.set, status())
-	i := face.MenuRowAt(y, len(rows))
-	if i < 0 {
+	menu := core.MenuSettings(c.set, status())
+	t := face.MenuTarget(x, y, menu, c.editing)
+	before := c.set
+	switch t.Kind {
+	case face.TargetNone:
 		c.mu.Unlock()
 		return
+	case face.TargetDone:
+		if c.editing < 0 {
+			c.menu = false
+		}
+		c.editing = -1
+	case face.TargetOpen:
+		c.editing = t.Index
+	case face.TargetMinus, face.TargetPlus:
+		delta := 1
+		if t.Kind == face.TargetMinus {
+			delta = -1
+		}
+		c.set = core.Step(c.set, menu[c.editing].ID, delta)
+	case face.TargetPick:
+		if id := menu[c.editing].ID; id == core.RowSSH {
+			go security.Get().SetSSH(t.Index == 1)
+		} else {
+			c.set = core.Choose(c.set, id, t.Index)
+		}
 	}
-	id := rows[i].ID
-	var saved core.Settings
-	switch id {
-	case core.RowDone:
-		c.menu = false
-	case core.RowSSH:
-		on := !security.Get().State().SSH
-		go security.Get().SetSSH(on)
-	default:
-		c.set = core.Cycle(c.set, id)
-		saved = c.set
-	}
+	after, open, editing := c.set, c.menu, c.editing
 	c.mu.Unlock()
-	slog.Info("kids: parent menu", "tapped", id)
+	slog.Info("kids: parent menu", "tap", t.Kind, "open", open, "editing", editing)
 	tick()
-	if saved != (core.Settings{}) {
-		speaker.Get().SetVolume(saved.Volume)
-		if err := saved.Save(core.SettingsPath); err != nil {
+	if after != before {
+		speaker.Get().SetVolume(after.Volume)
+		if err := after.Save(core.SettingsPath); err != nil {
 			slog.Error("kids: saving the settings failed", "err", err)
 		}
 	}

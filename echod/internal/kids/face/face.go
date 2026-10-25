@@ -2,15 +2,12 @@ package face
 
 import (
 	"image"
-	"image/color"
 	"image/draw"
 	"math"
 	"math/rand/v2"
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/image/font"
 
 	"github.com/HuskerMinion/techo5/echod/internal/kids/core"
 )
@@ -21,8 +18,10 @@ type Scene struct {
 	Style string // core.StyleYellow or core.StyleDark, for the day
 	Night bool
 
-	// Menu is the parent menu's rows while it is up, nil while it is not; Address goes under it.
-	Menu    []core.Row
+	// Menu is the parent menu's settings while it is up, nil while it is not. Editing is the one open
+	// on its own page, -1 for the ring of them all. Address is shown with SSH.
+	Menu    []core.Setting
+	Editing int
 	Address string
 
 	// Volume is shown on the rim while ShowVolume: the level, and the most the children may set.
@@ -127,69 +126,6 @@ func nightSky(c canvas) {
 }
 
 const moonY = 74.0
-
-// The menu: a dark page with a list, the label on the left of the middle and its value on the right.
-var (
-	menuGround = rgb(16, 20, 26)
-	menuText   = rgb(220, 226, 234)
-	menuDim    = rgb(120, 130, 142)
-	menuAccent = rgb(255, 208, 36)
-)
-
-const (
-	menuTitleY = 70
-	menuTop    = 112 // the first row's middle
-	menuRow    = 36
-)
-
-// MenuRowAt is the row of an n-row menu under y, or -1 for none.
-func MenuRowAt(y, n int) int {
-	i := int(math.Floor(float64(y-menuTop+menuRow/2) / menuRow))
-	if i < 0 || i >= n {
-		return -1
-	}
-	return i
-}
-
-func drawMenu(c canvas, s Scene) {
-	c.fill(menuGround)
-	title, body := comic(true, 26), comic(true, 22)
-	if title == nil || body == nil {
-		return
-	}
-	c.centered(title, "Ouders", center, menuTitleY, menuAccent)
-	lift := capHeight(body) / 2
-	for i, row := range s.Menu {
-		y := menuTop + i*menuRow
-		if row.Value == "" {
-			// An action: a button across the middle.
-			w := float64(textWidth(body, row.Label)) + 36
-			pill(c, center-w/2, center+w/2, float64(y), 30, menuAccent)
-			c.centered(body, row.Label, center, y+lift, menuGround)
-			continue
-		}
-		right(c, body, row.Label, center-10, y+lift, menuText)
-		c.centered(body, row.Value, center+10+textWidth(body, row.Value)/2, y+lift, menuAccent)
-	}
-	if s.Address != "" {
-		small := comic(false, 16)
-		c.centered(small, s.Address, center, menuTop+len(s.Menu)*menuRow+6, menuDim)
-	}
-}
-
-func textWidth(f font.Face, s string) int { return font.MeasureString(f, s).Round() }
-
-// right draws s ending at x.
-func right(c canvas, f font.Face, s string, x, y int, col color.Color) {
-	c.centered(f, s, x-textWidth(f, s)/2, y, col)
-}
-
-// pill is a bar with round ends from x0 to x1, h tall, its middle at y.
-func pill(c canvas, x0, x1, y, h float64, col color.RGBA) {
-	c.poly([][2]float64{{x0, y - h/2}, {x1, y - h/2}, {x1, y + h/2}, {x0, y + h/2}}, col)
-	c.disc(x0, y, h/2, col)
-	c.disc(x1, y, h/2, col)
-}
 
 // Label is for tests and logs: what a scene is, in a word.
 func (s Scene) Label() string {

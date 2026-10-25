@@ -4,9 +4,10 @@
 time when you tap it, and has no microphones, no camera and no assistant at all.**
 
 <p align="center">
-  <img src="../docs/kids/day.png" width="220" alt="The learning clock by day">
-  <img src="../docs/kids/night.png" width="220" alt="The night sky between bedtime and waketime">
-  <img src="../docs/kids/menu.png" width="220" alt="The parent menu">
+  <img src="../docs/kids/day.png" width="200" alt="The learning clock by day">
+  <img src="../docs/kids/night.png" width="200" alt="The night sky between bedtime and waketime">
+  <img src="../docs/kids/menu.png" width="200" alt="The parent menu">
+  <img src="../docs/kids/menu-setting.png" width="200" alt="A setting on its own page">
 </p>
 
 This is a fork of [TECHO5](https://github.com/HuskerMinion/techo5), which frees old Echo devices from
@@ -21,10 +22,12 @@ speaker) and puts a different daemon on top: one made for a child's room.
   (*Kids Dark*), with white edges.
 - **Tap it and it tells the time**, in Dutch for now: *"Het is tien voor half acht."* The top button
   does the same. The device has no text-to-speech, so it plays one clip per minute, rendered beforehand.
-- **Volume** from the buttons or a swipe, never above the maximum a parent sets.
+- **Volume** from the buttons only (a swipe does nothing), never above the maximum a parent sets.
 - **Night**: between bedtime and waketime the screen is a dim night sky with a small clock.
-- **A parent menu**: hold both volume buttons for three seconds. Maximum volume, brightness, night
-  light, clock style, bedtime and waketime, and SSH. It closes by itself when it is left alone.
+- **A parent menu**: hold both volume buttons for three seconds. Every setting is a large round button
+  (maximum volume, brightness, night light, clock style, bedtime, waketime, SSH) that opens on a page of
+  its own with big − and + keys, in the shapes of TECHO5's own round screens. It closes by itself when
+  it is left alone.
 
 ## What it does not have
 

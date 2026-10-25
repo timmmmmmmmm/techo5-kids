@@ -67,31 +67,73 @@ func TestSettingsSurviveASaveAndALoad(t *testing.T) {
 	}
 }
 
-func TestEveryRowCyclesRoundToWhereItStarted(t *testing.T) {
-	for _, id := range []string{RowMaxVolume, RowBrightness, RowNightLight, RowStyle, RowBedtime, RowWaketime} {
-		start := Defaults()
-		start.Volume = 5 // under every maximum, so lowering one does not move it
-		s := Cycle(start, id)
-		if s == start {
-			t.Errorf("%s: a tap changed nothing", id)
+func TestStepsStopAtEitherEnd(t *testing.T) {
+	for _, id := range []string{RowMaxVolume, RowBrightness, RowNightLight, RowBedtime, RowWaketime} {
+		s := Defaults()
+		s.Volume = 0
+		for range 20 {
+			s = Step(s, id, +1)
+		}
+		top := s
+		if Step(top, id, +1) != top {
+			t.Errorf("%s: + past the last step moved", id)
 		}
 		for range 20 {
-			if s = Cycle(s, id); s == start {
-				break
-			}
+			s = Step(s, id, -1)
 		}
-		if s != start {
-			t.Errorf("%s: never came round to the start again", id)
+		if Step(s, id, -1) != s || s == top {
+			t.Errorf("%s: - did not stop at the first step", id)
 		}
+	}
+}
+
+func TestAValueSetElsewhereStepsToItsNeighbor(t *testing.T) {
+	s := Defaults()
+	s.Brightness, s.Bedtime = 50, "19:10"
+	if got := Step(s, RowBrightness, +1).Brightness; got != 60 {
+		t.Errorf("50%% + is %d, want 60", got)
+	}
+	if got := Step(s, RowBrightness, -1).Brightness; got != 40 {
+		t.Errorf("50%% - is %d, want 40", got)
+	}
+	if got := Step(s, RowBedtime, +1).Bedtime; got != "19:30" {
+		t.Errorf("19:10 + is %s, want 19:30", got)
+	}
+	if got := Step(s, RowBedtime, -1).Bedtime; got != "19:00" {
+		t.Errorf("19:10 - is %s, want 19:00", got)
 	}
 }
 
 func TestLoweringTheMaximumTakesTheVolumeDownWithIt(t *testing.T) {
 	s := Defaults()
-	s.MaxVolume, s.Volume = 30, 28
-	s = Cycle(s, RowMaxVolume) // 30 is the last choice: round to 10
+	s.MaxVolume, s.Volume = 15, 14
+	s = Step(s, RowMaxVolume, -1)
 	if s.MaxVolume != 10 || s.Volume != 10 {
 		t.Errorf("max %d, volume %d", s.MaxVolume, s.Volume)
+	}
+}
+
+func TestTheMenuShowsWhatIsSet(t *testing.T) {
+	s := Defaults()
+	s = Choose(s, RowStyle, 1)
+	if s.Style != StyleDark {
+		t.Fatal("choosing Zwart did not make the clock dark")
+	}
+	for _, m := range MenuSettings(s, Status{SSH: true}) {
+		switch m.ID {
+		case RowStyle:
+			if m.Index != 1 || m.Value != "Zwart" {
+				t.Errorf("style shows %d %q", m.Index, m.Value)
+			}
+		case RowSSH:
+			if m.Index != 1 || m.Value != "Aan" {
+				t.Errorf("ssh shows %d %q", m.Index, m.Value)
+			}
+		case RowMaxVolume:
+			if m.Value != "20" || m.Index < 0 {
+				t.Errorf("max volume shows %d %q", m.Index, m.Value)
+			}
+		}
 	}
 }
 
