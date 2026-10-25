@@ -79,12 +79,13 @@ ssh root@<spot> 'mount --bind /tmp/kidsd /usr/local/bin/techo5 && killall techo5
 That runs it until the next reboot, after which the Spot is back on TECHO5. Installing it for good
 means copying it over `/usr/local/bin/techo5` in the running slot (keep the original beside it).
 The spoken time needs a set of clips in `/data/misc/techo5/time/nl/`: `HHMM.wav` for every minute of a
-twelve-hour clock (`0720.wav` is "Het is tien voor half acht."), 16-bit mono WAV at 16 kHz.
-[cmd/kidsclips](../echod/cmd/kidsclips) renders them on the Mac, with macOS' own `say` voice for free,
-or with [Mistral's Voxtral](https://docs.mistral.ai/api/#tag/audio) for a nicer one (`MISTRAL_API_KEY`
-in the environment). One full set is about twenty eurocents of Voxtral. A language is a sentences
-module like [saynl.go](../echod/internal/kids/core/saynl.go) pinned by its fixture — pull requests
-welcome.
+twelve-hour clock (`0720.wav` is "Het is tien voor half acht."), 16-bit mono WAV at 16 kHz. The Dutch
+set in Lotte's voice is [on the releases](https://github.com/timmmmmmmmm/techo5-kids/releases/tag/clips-nl-lotte-1),
+and [cmd/kidsclips](../echod/cmd/kidsclips) renders a set on the Mac — macOS' own `say` voice for
+free, or [Mistral's Voxtral](https://docs.mistral.ai/api/#tag/audio) for a nicer one
+(`MISTRAL_API_KEY` in the environment). One full set is about twenty eurocents of Voxtral. A language
+is a sentences module like [saynl.go](../echod/internal/kids/core/saynl.go) pinned by its fixture —
+pull requests welcome.
 
 Early days: this is one family's clock, being built in the open.
 
